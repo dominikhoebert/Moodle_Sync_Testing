@@ -1,6 +1,9 @@
 import moodle_api
 import pandas as pd
 import requests
+import warnings
+
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 """
 [SSL: CERTIFICATE_VERIFY_FAILED] Error: https://stackoverflow.com/questions/51925384/unable-to-get-local-issuer-certificate-when-using-requests-in-python
@@ -19,16 +22,15 @@ class MoodleSync:
         response = response.json()
         return response['token']
 
-    def create_group(self, course_id: int, group_name: str):
+    def create_group(self, groups: list):
         """ Creates a group in moodle with the given name and adds the given students to it. """
-        response = moodle_api.call('core_group_create_groups',
-                                   groups=[{"courseid": course_id, "name": group_name, "description": ""}])
+        response = moodle_api.call('core_group_create_groups', groups=groups)
         response = response.json()
         return response
 
-    def add_students_to_group(self, group_id: int, user: int):
+    def add_students_to_group(self, members: list):
         """ Adds the given students to the given group. """
-        response = moodle_api.call('core_group_add_group_members', members=[{"groupid": group_id, "userid": user}])
+        response = moodle_api.call('core_group_add_group_members', members=members)
         return response
 
     def get_recent_courses(self):
@@ -62,6 +64,17 @@ class MoodleSync:
         df = df.rename(columns={None: 'Kurs', 'userfullname': 'Schüler'})
         return df
 
+    def get_enrolled_students(self, course_id):
+        """
+        Returns a DataFrame with user info id, fullname, email, groups (all groups as joined str)"""
+        response = moodle_api.call('core_enrol_get_enrolled_users', courseid=course_id)
+        user_df = pd.DataFrame(columns=['id', 'firstname', 'lastname', 'email'])
+        for student in response:
+            user_df = user_df.append(
+                {"id": student["id"], "firstname": student["firstname"], "lastname": student["lastname"],
+                 "email": student["email"]}, ignore_index=True)
+        return user_df
+
     def get_student_info(self, userlist):
         """
         Takes an array of dict with key userid=int, courseid=int
@@ -84,3 +97,14 @@ class MoodleSync:
                 ignore_index=True)
 
         return user_df
+
+    def enroll_students(self, enrolments: list):
+        """ Enrolls the given students in the given course. """
+        r = moodle_api.call('enrol_manual_enrol_users', enrolments=enrolments)
+        return r
+
+    def get_user_by_field(self, field: str):
+        r = moodle_api.call('core_user_get_users_by_field', field=field)
+        print(r)
+        # TODO return user_df or None
+        return r
