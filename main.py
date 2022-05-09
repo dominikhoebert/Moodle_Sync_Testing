@@ -5,6 +5,8 @@ import openpyxl
 import random
 
 if __name__ == "__main__":
+    import warnings
+    warnings.simplefilter("ignore")
 
     filename = "data/20220507_Noten_SYT Grundkompetenztestung.xlsx"
     course_id = 1086
@@ -75,7 +77,10 @@ if __name__ == "__main__":
         credentials = json.load(f)
     url = credentials["url"]
     token = credentials["token"]
-    ms = MoodleSync(url, token)
+    username = credentials["user"]
+    password = credentials["password"]
+    service = credentials["service"]
+    ms = MoodleSync(url, username, password, service)
     print("Loading student infos from Moodle, please wait...")
     student_info_df = ms.get_enrolled_students(course_id)
 
@@ -83,36 +88,28 @@ if __name__ == "__main__":
 
     # show students how are not enrolled
     not_enrolled_df = df2[df2["id"].isnull()]
+    print("\nStudents not enrolled:")
     for i, row in not_enrolled_df.iterrows():
-        print(f"{row['Schüler']} {row['Email']} is not enrolled")
+        print(f"\t{row['Schüler']} {row['Email']}")
     # ask if you want to enroll them automatically or continue
     choice = input("Do you want to enroll them automatically? (y/n): ")
     if choice == "y":
         # if yes, find students by name? or by email? and enroll them
-        students = []
-        not_found_students = []
-        for i, row in not_enrolled_df.iterrows():
-            response = ms.get_user_by_field(row["Email"])  # TODO to test when available
-            if response is None:
-                not_found_students.append(row)
-            else:
-                students.append(response)
+        emails = not_enrolled_df["Email"].tolist()
+        print(emails)
+        response = ms.get_user_by_email(emails)
 
         enrolments = []
-        for s in students:
-            enrolments.append({'roleid': role_id, 'userid': s, 'courseid': course_id})
+        for s in response:
+            enrolments.append({'roleid': role_id, 'userid': s['id'], 'courseid': course_id})
         print("\nEnrolling students:")
-        print("\n".join(f"{s['firstname']} {s['lastname']} ({s['email']})" for s in students))
-        if len(not_found_students) > 0:
-            # show students that cannot be found
-            print("\nNot found:")
-            print("\n".join(f"{s['firstname']} {s['lastname']} ({s['email']})" for s in not_found_students))
-        else:
-            print("All students enrolled.")
+        print("\t")
+        print("\n\t".join(f"{s['fullname']} {s['email']}" for s in response))
         # do you want to continue? or stop to enroll them manually
         choice = input(f"Do you want to enroll {len(enrolments)}? (y/n): ")
         if choice == "y":
-            ms.enroll_students(enrolments)
+            r = ms.enroll_students(enrolments)  # TODO to test when available
+            print(r)
 
         choice = input("Do you want to continue? (y/n): ")
         if choice == "y":
@@ -143,22 +140,25 @@ if __name__ == "__main__":
             {"courseid": course_id, "name": f'GruppeSYT{c}@{datestring}', "description": "", "idnumber": group_id})
 
     print("\nCreating groups:")
-    print("\n".join(f"{g['name']} ({g['idnumber']})" for g in groups))
+    print("\t" + "\n\t".join(f"{g['name']} ({g['idnumber']})" for g in groups))
     choice = input("Do you want to continue? (y/n): ")
     if choice == "y":
-        # ms.create_group(groups) # TODO uncomment this line to create groups when service is available
-        pass
+        response = ms.create_group(groups)
 
-    # add students to groups
-    members = []
-    for c in needed_competences:
-        user_ids = df2[df2[choice_column_name].str.contains(c)]["id"].tolist()
-        for user_id in user_ids:
-            members.append({"groupid": group_ids[c], "userid": user_id})
+        groupsids = {}
+        for g in response:
+            groupsids[g["idnumber"]] = g["id"]
 
-    choice = input(f"Do you want to add {len(members)} students to {len(needed_competences)} competences? (y/n): ")
-    if choice == "y":
-        # ms.add_members(members) # TODO uncomment this line to add students to groups when service is available
-        pass
+        # add students to groups
+        members = []
+        for c in needed_competences:
+            user_ids = df2[df2[choice_column_name].str.contains(c)]["id"].tolist()
+            for user_id in user_ids:
+                members.append({"groupid": groupsids[group_ids[c]], "userid": user_id})
+
+        choice = input(f"Do you want to add {len(members)} students to {len(needed_competences)} competences? (y/n): ")
+        if choice == "y":
+            response = ms.add_students_to_group(members)
+            print("Done")
 
     # create quizes

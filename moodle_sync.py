@@ -12,9 +12,9 @@ Install certifi; copy cacert.pem aus certifi folder
 
 
 class MoodleSync:
-    def __init__(self, url: str, key: str):
+    def __init__(self, url: str, username: str, password: str, service: str):
         moodle_api.URL = url
-        moodle_api.KEY = key
+        moodle_api.KEY = self.get_token(url, username, password, service)
 
     def get_token(self, url, username, password, service):
         obj = {"username": username, "password": password, "service": service}
@@ -25,7 +25,6 @@ class MoodleSync:
     def create_group(self, groups: list):
         """ Creates a group in moodle with the given name and adds the given students to it. """
         response = moodle_api.call('core_group_create_groups', groups=groups)
-        response = response.json()
         return response
 
     def add_students_to_group(self, members: list):
@@ -103,8 +102,19 @@ class MoodleSync:
         r = moodle_api.call('enrol_manual_enrol_users', enrolments=enrolments)
         return r
 
-    def get_user_by_field(self, field: str):
-        r = moodle_api.call('core_user_get_users_by_field', field=field)
-        print(r)
-        # TODO return user_df or None
-        return r
+    def get_user_by_email(self, emails: list):
+        response = moodle_api.call('core_user_get_users_by_field', field="email", values=emails)
+        return response
+
+
+if __name__ == "__main__":
+    import json
+
+    with open("data/credentials.json", "r") as f:
+        credentials = json.load(f)
+    url = credentials["url"]
+    username = credentials["user"]
+    password = credentials["password"]
+    service = credentials["service"]
+    ms = MoodleSync(url, username, password, service)
+    print(ms.get_user_by_email(["dhoebert@tgm.ac.at"]))
