@@ -1,5 +1,9 @@
 import moodle_api
 import pandas as pd
+import requests
+import warnings
+
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 """
 [SSL: CERTIFICATE_VERIFY_FAILED] Error: https://stackoverflow.com/questions/51925384/unable-to-get-local-issuer-certificate-when-using-requests-in-python
@@ -8,9 +12,25 @@ Install certifi; copy cacert.pem aus certifi folder
 
 
 class MoodleSync:
-    def __init__(self, url: str, key: str):
+    def __init__(self, url: str, username: str, password: str, service: str):
         moodle_api.URL = url
-        moodle_api.KEY = key
+        moodle_api.KEY = self.get_token(url, username, password, service)
+
+    def get_token(self, url, username, password, service):
+        obj = {"username": username, "password": password, "service": service}
+        response = requests.post(url + "/login/token.php", data=obj)
+        response = response.json()
+        return response['token']
+
+    def create_group(self, groups: list):
+        """ Creates a group in moodle with the given name and adds the given students to it. """
+        response = moodle_api.call('core_group_create_groups', groups=groups)
+        return response
+
+    def add_students_to_group(self, members: list):
+        """ Adds the given students to the given group. """
+        response = moodle_api.call('core_group_add_group_members', members=members)
+        return response
 
     def get_recent_courses(self):
         response = moodle_api.call('core_course_get_recent_courses')
@@ -43,6 +63,17 @@ class MoodleSync:
         df = df.rename(columns={None: 'Kurs', 'userfullname': 'Schüler'})
         return df
 
+    def get_enrolled_students(self, course_id):
+        """
+        Returns a DataFrame with user info id, fullname, email, groups (all groups as joined str)"""
+        response = moodle_api.call('core_enrol_get_enrolled_users', courseid=course_id)
+        user_df = pd.DataFrame(columns=['id', 'firstname', 'lastname', 'email'])
+        for student in response:
+            user_df = user_df.append(
+                {"id": student["id"], "firstname": student["firstname"], "lastname": student["lastname"],
+                 "email": student["email"]}, ignore_index=True)
+        return user_df
+
     def get_student_info(self, userlist):
         """
         Takes an array of dict with key userid=int, courseid=int
@@ -65,3 +96,25 @@ class MoodleSync:
                 ignore_index=True)
 
         return user_df
+
+    def enroll_students(self, enrolments: list):
+        """ Enrolls the given students in the given course. """
+        r = moodle_api.call('enrol_manual_enrol_users', enrolments=enrolments)
+        return r
+
+    def get_user_by_email(self, emails: list):
+        response = moodle_api.call('core_user_get_users_by_field', field="email", values=emails)
+        return response
+
+
+if __name__ == "__main__":
+    import json
+
+    with open("data/credentials.json", "r") as f:
+        credentials = json.load(f)
+    url = credentials["url"]
+    username = credentials["user"]
+    password = credentials["password"]
+    service = credentials["service"]
+    ms = MoodleSync(url, username, password, service)
+    print(ms.get_user_by_email(["dhoebert@tgm.ac.at"]))
