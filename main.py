@@ -2,13 +2,15 @@ import pandas as pd
 import json
 from moodle_sync import MoodleSync
 import openpyxl
+from openpyxl.utils import get_column_letter
 import random
 
 if __name__ == "__main__":
     import warnings
+
     warnings.simplefilter("ignore")
 
-    filename = "data/20220507_Noten_SYT Grundkompetenztestung.xlsx"
+    filename = "data/20220504_SYT1abHIT.xlsx"
     course_id = 1086
     datestring = "20220507"
     role_id = 5  # student
@@ -28,19 +30,20 @@ if __name__ == "__main__":
 
     # iter over first row to find the last interesting column
     ws = file[file.sheetnames[choice]]
-    end_column = None
-    end_column_letter = None
+    end_column = ws.max_column + 1
+    end_column_letter = get_column_letter(ws.max_column)
     email_column = None
     for cell in ws[1]:
         if cell.value == "Email":
             email_column = cell.column
         if cell.value is None:
             end_column = cell.column
-            end_column_letter = cell.column_letter
+            end_column_letter = cell.column_letter3
+
             break
 
     # iter over first row to find the last interesting row
-    end_row = None
+    end_row = ws.max_row + 1
     for cell in ws["A"]:
         if cell.value is None:
             end_row = cell.row
@@ -56,6 +59,7 @@ if __name__ == "__main__":
     data = list(data)
     data = (islice(r, 0, end_column - 1) for r in data[:end_row - 2])
     df = pd.DataFrame(data, columns=cols)
+    print(len(df), " Students found")
 
     for i, col in enumerate(df.columns):
         print(f"[{i + 1}] {col}")
@@ -76,7 +80,6 @@ if __name__ == "__main__":
     with open("data/credentials.json", "r") as f:
         credentials = json.load(f)
     url = credentials["url"]
-    token = credentials["token"]
     username = credentials["user"]
     password = credentials["password"]
     service = credentials["service"]
@@ -108,8 +111,7 @@ if __name__ == "__main__":
         # do you want to continue? or stop to enroll them manually
         choice = input(f"Do you want to enroll {len(enrolments)}? (y/n): ")
         if choice == "y":
-            r = ms.enroll_students(enrolments)  # TODO to test when available
-            print(r)
+            r = ms.enroll_students(enrolments)
 
         choice = input("Do you want to continue? (y/n): ")
         if choice == "y":
