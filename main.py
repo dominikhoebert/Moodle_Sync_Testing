@@ -10,9 +10,9 @@ if __name__ == "__main__":
 
     warnings.simplefilter("ignore")
 
-    filename = "data/20220504_SYT1abHIT.xlsx"
+    filename = "data/20220528_Noten.xlsx"
     course_id = 1086
-    datestring = "20220507"
+    datestring = "20220615"
     role_id = 5  # student
     file = openpyxl.load_workbook(filename, data_only=True)
     for i, sheet in enumerate(file.sheetnames):
@@ -38,7 +38,7 @@ if __name__ == "__main__":
             email_column = cell.column
         if cell.value is None:
             end_column = cell.column
-            end_column_letter = cell.column_letter3
+            end_column_letter = cell.column_letter
 
             break
 
