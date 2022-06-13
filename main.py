@@ -10,7 +10,7 @@ if __name__ == "__main__":
 
     warnings.simplefilter("ignore")
 
-    filename = "data/20220528_Noten.xlsx"
+    filename = "/Users/dominik/Dropbox/TGM/Systemtechnik SYT/Schuljahr 21_22/20220611_Noten.xlsx"
     course_id = 1086
     datestring = "20220615"
     role_id = 5  # student
@@ -99,7 +99,6 @@ if __name__ == "__main__":
     if choice == "y":
         # if yes, find students by name? or by email? and enroll them
         emails = not_enrolled_df["Email"].tolist()
-        print(emails)
         response = ms.get_user_by_email(emails)
 
         enrolments = []
@@ -112,6 +111,7 @@ if __name__ == "__main__":
         choice = input(f"Do you want to enroll {len(enrolments)}? (y/n): ")
         if choice == "y":
             r = ms.enroll_students(enrolments)
+            # TODO print # of successful enrolments
 
         choice = input("Do you want to continue? (y/n): ")
         if choice == "y":

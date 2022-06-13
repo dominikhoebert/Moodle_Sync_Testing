@@ -6,4 +6,4 @@ Then creats the groups and adds the students to the groups.
 
 ## TODO
 
-- check for existing groups
+- check for existing groups (needs core_group_get_course_groups)
