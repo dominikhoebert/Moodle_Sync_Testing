@@ -70,7 +70,7 @@ class MoodleSync:
         user_df = pd.DataFrame(columns=['id', 'firstname', 'lastname', 'email'])
         for student in response:
             user_df = user_df.append(
-                {"id": student["id"], "firstname": student["firstname"], "lastname": student["lastname"],
+                {"id_moo": student["id"], "firstname": student["firstname"], "lastname": student["lastname"],
                  "email": student["email"]}, ignore_index=True)
         return user_df
 
