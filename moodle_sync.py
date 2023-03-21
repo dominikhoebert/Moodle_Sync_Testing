@@ -67,11 +67,11 @@ class MoodleSync:
         """
         Returns a DataFrame with user info id, fullname, email, groups (all groups as joined str)"""
         response = moodle_api.call('core_enrol_get_enrolled_users', courseid=course_id)
-        user_df = pd.DataFrame(columns=['id', 'firstname', 'lastname', 'email'])
+        user_df = pd.DataFrame(columns=['id_joined', 'firstname', 'lastname', 'email_joined'])
         for student in response:
             user_df = user_df.append(
-                {"id_moo": student["id"], "firstname": student["firstname"], "lastname": student["lastname"],
-                 "email": student["email"]}, ignore_index=True)
+                {"id_joined": student["id"], "firstname": student["firstname"], "lastname": student["lastname"],
+                 "email_joined": student["email"]}, ignore_index=True)
         return user_df
 
     def get_student_info(self, userlist):

@@ -4,8 +4,8 @@ from moodle_sync import MoodleSync
 import openpyxl
 from openpyxl.utils import get_column_letter
 import random
-from getpass import getpass
 from itertools import islice
+from datetime import datetime
 
 role_id = 5  # student
 
@@ -22,93 +22,89 @@ def dialog(file):
 
     ms = login_moodlesync()
     course_id = get_courseid(ms)
+    print("Loading student infos from Moodle, please wait...")
+    student_info_df = ms.get_enrolled_students(course_id)
 
     for i, col in enumerate(df.columns):
         print(f"[{i + 1}] {col}")
 
-    choice_column_name = df.columns[get_column_choice("Groupname Column", df)]
+    group_column_name = df.columns[get_column_choice("Groupname Column", df)]
     moodleid_column_name = get_moodleid_column_name(df)
 
+    email_column_name = None
     if moodleid_column_name is None:
         email_column_name = df.columns[get_column_choice("Email Column", df)]
-
-        print("Loading student infos from Moodle, please wait...")
-        student_info_df = ms.get_enrolled_students(course_id)
-
-        df = df.merge(student_info_df, left_on=email_column_name, right_on="email", how="left")
+        df2 = df.merge(student_info_df, left_on=email_column_name, right_on="email", how="left")
         moodleid_column_name = "id"
+    else:
+        df2 = df.merge(student_info_df, left_on=moodleid_column_name, right_on="id_joined", how="left")
 
-    # show students how are not enrolled
-    not_enrolled_df = df[df["id_moo"].isnull()]
-    print("\nStudents not enrolled:")
-    for i, row in not_enrolled_df.iterrows():
-        print(f"\t{row['Schüler']}")
+    df2 = enroll_students(course_id, df, df2, moodleid_column_name, email_column_name, ms)
+    df2 = df2[df2["id_joined"].notnull()]
 
-    choice = input("Do you want to enroll them automatically? (y/n): ")
-    if choice == "y":
-        if moodleid_column_name is None:
-            emails = not_enrolled_df["Email"].tolist()
-            response = ms.get_user_by_email(emails)
-            not_enrolled_ids = [s["id"] for s in response]
-        else:
-            not_enrolled_ids = df[moodleid_column_name].tolist()
-        enrolments = []
-        for id in not_enrolled_ids:
-            enrolments.append({'roleid': 5, 'userid': id, 'courseid': course_id})  # 5 = student
-        # do you want to continue? or stop to enroll them manually
-        choice = input(f"Do you want to enroll {len(enrolments)}? (y/n): ")
-        if choice == "y":
-            r = ms.enroll_students(enrolments)
-            # TODO print # of successful enrolments
-            print("Loading student infos from Moodle, please wait...")
-            student_info_df = ms.get_enrolled_students(course_id)
-            df = df.merge(student_info_df, left_on="Email", right_on="email", how="left")
-    df = df[df["id_moo"].notnull()]
+    print(df[group_column_name].unique())
+    group_names = df[group_column_name].unique()
+    print(f"{len(group_names)} groups found:")
+    print("\n\t".join(group_names))
 
-    # TODO continue here
-
-
-    # if no continue
-    # iter over chosen column and find all needed competences
-    needed_competences = []
-    for i, value in df2[choice_column_name].iteritems():
-        for competence in value.split(";")[:-1]:
-            if competence not in needed_competences:
-                needed_competences.append(competence)
-
-    needed_competences = sorted(needed_competences)
-    print(";".join(needed_competences), " needed competences found.")
-
-    # create groups
-    groups = []
-    group_ids = {}
-    for c in needed_competences:
-        group_id = datestring + str(random.randrange(100, 999))
-        group_ids[c] = group_id
-        groups.append(
-            {"courseid": course_id, "name": f'GruppeSYT{c}@{datestring}', "description": "", "idnumber": group_id})
-
-    print("\nCreating groups:")
-    print("\t" + "\n\t".join(f"{g['name']} ({g['idnumber']})" for g in groups))
     choice = input("Do you want to continue? (y/n): ")
     if choice == "y":
+        # create groups
+        groups = []
+        group_ids = {}
+        datestring = datetime.now().strftime("%Y%m%d")
+        for g in group_names:
+            group_id = datestring + str(random.randrange(100, 999))
+            group_ids[g] = group_id
+            groups.append(
+                {"courseid": course_id, "name": g, "description": "", "id_joined": group_id})
+
         response = ms.create_group(groups)
 
         groupsids = {}
         for g in response:
-            groupsids[g["idnumber"]] = g["id"]
+            groupsids[g["id_joined"]] = g["id"]
 
         # add students to groups
         members = []
-        for c in needed_competences:
-            user_ids = df2[df2[choice_column_name].str.contains(c)]["id"].tolist()
-            for user_id in user_ids:
-                members.append({"groupid": groupsids[group_ids[c]], "userid": user_id})
+        for g in group_names:
+            user_ids = df2[df2[choice_column_name].str.contains(g)]["id"].tolist()
+            for user_id in df[df[group_column_name] == g]["id_moo"]:
+                members.append({"groupid": groupsids[group_ids[g]], "userid": user_id})
 
-        choice = input(f"Do you want to add {len(members)} students to {len(needed_competences)} competences? (y/n): ")
+        choice = input(f"Do you want to add {len(members)} students to {len(group_names)} groups? (y/n): ")
         if choice == "y":
             response = ms.add_students_to_group(members)
             print("Done")
+
+
+def enroll_students(course_id, df, df2, moodleid_column_name, email_column_name, ms):
+    # show students how are not enrolled
+    not_enrolled_df = df2[df2["id_joined"].isnull()]
+    choice = input(f"{len(not_enrolled_df)} Students not enrolled. Do you want to enroll them automatically? (y/n): ")
+    if choice == "y":
+        if email_column_name:
+            emails = not_enrolled_df[email_column_name].tolist()
+            response = ms.get_user_by_email(emails)
+            not_enrolled_ids = [s["id"] for s in response]
+        elif moodleid_column_name:
+            not_enrolled_ids = not_enrolled_df[moodleid_column_name].tolist()
+        else:
+            print("Error: No email or moodleid column found. Exiting...")
+            exit()
+        enrolments = []
+        for id in not_enrolled_ids:
+            enrolments.append({'roleid': 5, 'userid': id, 'courseid': course_id})  # 5 = student
+        # do you want to continue? or stop to enroll them manually
+        choice = input(f"Found {len(enrolments)} students. Enroll? (y/n): ")
+        if choice == "y":
+            r = ms.enroll_students(enrolments)
+            print(r)
+            # TODO print # of successful enrolments
+            print("Loading student infos from Moodle, please wait...")
+            student_info_df = ms.get_enrolled_students(course_id)
+            df2 = df.merge(student_info_df, left_on="Email", right_on="email_joined", how="left")
+    return df2
 
 
 def get_moodleid_column_name(df):
@@ -199,10 +195,7 @@ def read_in_ecxel(file):
     # find last column with data
     end_column = ws.max_column + 1
     end_column_letter = get_column_letter(ws.max_column)
-    email_column = None
     for cell in ws[1]:
-        if cell.value == "Email":
-            email_column = cell.column
         if cell.value is None:
             end_column = cell.column
             end_column_letter = cell.column_letter
