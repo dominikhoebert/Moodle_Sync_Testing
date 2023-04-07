@@ -35,14 +35,16 @@ def dialog(file):
     if moodle_id_column_name is None:
         email_column_name = df.columns[get_column_choice("Email Column", df)]
         df2 = df.merge(student_info_df, left_on=email_column_name, right_on="email_joined", how="left")
-        moodle_id_column_name = "id"
+        moodle_id_column_name = "id_joined"
     else:
         df2 = df.merge(student_info_df, left_on=moodle_id_column_name, right_on="id_joined", how="left")
 
     df2 = enroll_students(course_id, df, df2, moodle_id_column_name, email_column_name, ms)
     df2 = df2[df2["id_joined"].notnull()]
+    df2 = df2[df2[group_column_name] != ""]
+    df2 = df2[df2[group_column_name].notnull()]
 
-    group_names = df[group_column_name].unique()
+    group_names = df2[group_column_name].unique()
     print(f"{len(group_names)} groups found:")
     print("\t" + "\n\t".join(group_names))
 
@@ -65,7 +67,7 @@ def dialog(file):
     # add students to groups
     members = []
     for g in group_names:
-        for user_id in df[df[group_column_name] == g][moodle_id_column_name].tolist():
+        for user_id in df2[df2[group_column_name] == g][moodle_id_column_name].tolist():
             members.append({"groupid": groups_ids[group_ids[g]], "userid": user_id})
 
     print(members)
