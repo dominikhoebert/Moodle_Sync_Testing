@@ -12,7 +12,7 @@ role_id = 5  # student
 
 def dialog(file):
     if file.endswith(".xlsx"):
-        df = read_in_ecxel(file)
+        df = read_in_excel(file)
     elif file.endswith(".csv"):
         df = pd.read_csv(file)
     else:
@@ -20,8 +20,8 @@ def dialog(file):
         exit()
     print(len(df), " Students found")
 
-    ms = login_moodlesync()
-    course_id = get_courseid(ms)
+    ms = login_moodle_sync()
+    course_id = get_course_id(ms)
     print("Loading student infos from Moodle, please wait...")
     student_info_df = ms.get_enrolled_students(course_id)
 
@@ -29,17 +29,17 @@ def dialog(file):
         print(f"[{i + 1}] {col}")
 
     group_column_name = df.columns[get_column_choice("Groupname Column", df)]
-    moodleid_column_name = get_moodleid_column_name(df)
+    moodle_id_column_name = get_moodle_id_column_name(df)
 
     email_column_name = None
-    if moodleid_column_name is None:
+    if moodle_id_column_name is None:
         email_column_name = df.columns[get_column_choice("Email Column", df)]
         df2 = df.merge(student_info_df, left_on=email_column_name, right_on="email_joined", how="left")
-        moodleid_column_name = "id"
+        moodle_id_column_name = "id"
     else:
-        df2 = df.merge(student_info_df, left_on=moodleid_column_name, right_on="id_joined", how="left")
+        df2 = df.merge(student_info_df, left_on=moodle_id_column_name, right_on="id_joined", how="left")
 
-    df2 = enroll_students(course_id, df, df2, moodleid_column_name, email_column_name, ms)
+    df2 = enroll_students(course_id, df, df2, moodle_id_column_name, email_column_name, ms)
     df2 = df2[df2["id_joined"].notnull()]
 
     group_names = df[group_column_name].unique()
@@ -49,25 +49,24 @@ def dialog(file):
     # create groups
     groups = []
     group_ids = {}
-    datestring = datetime.now().strftime("%Y%m%d")
+    date_string = datetime.now().strftime("%Y%m%d")
     for g in group_names:
-        group_id = datestring + str(random.randrange(100, 999))
+        group_id = date_string + str(random.randrange(100, 999))
         group_ids[g] = group_id
         groups.append(
             {"courseid": course_id, "name": g, "description": "", "idnumber": group_id})
 
     response = ms.create_group(groups)
 
-    groupsids = {}
+    groups_ids = {}
     for g in response:
-        groupsids[g["idnumber"]] = g["id"]
-
+        groups_ids[g["idnumber"]] = g["id"]
 
     # add students to groups
     members = []
     for g in group_names:
-        for user_id in df[df[group_column_name] == g][moodleid_column_name].tolist():
-            members.append({"groupid": groupsids[group_ids[g]], "userid": user_id})
+        for user_id in df[df[group_column_name] == g][moodle_id_column_name].tolist():
+            members.append({"groupid": groups_ids[group_ids[g]], "userid": user_id})
 
     print(members)
 
@@ -77,18 +76,19 @@ def dialog(file):
         print("Done")
 
 
-def enroll_students(course_id, df, df2, moodleid_column_name, email_column_name, ms):
+def enroll_students(course_id, df, df2, moodle_id_column_name, email_column_name, ms):
     # show students how are not enrolled
     not_enrolled_df = df2[df2["id_joined"].isnull()]
     if len(not_enrolled_df) > 0:
-        choice = input(f"{len(not_enrolled_df)} Students not enrolled. Do you want to enroll them automatically? (y/n): ")
+        choice = input(
+            f"{len(not_enrolled_df)} Students not enrolled. Do you want to enroll them automatically? (y/n): ")
         if choice == "y":
             if email_column_name:
                 emails = not_enrolled_df[email_column_name].tolist()
                 response = ms.get_user_by_email(emails)
                 not_enrolled_ids = [s["id"] for s in response]
-            elif moodleid_column_name:
-                not_enrolled_ids = not_enrolled_df[moodleid_column_name].tolist()
+            elif moodle_id_column_name:
+                not_enrolled_ids = not_enrolled_df[moodle_id_column_name].tolist()
             else:
                 print("Error: No email or moodleid column found. Exiting...")
                 exit()
@@ -101,22 +101,22 @@ def enroll_students(course_id, df, df2, moodleid_column_name, email_column_name,
             student_info_df = ms.get_enrolled_students(course_id)
             if email_column_name:
                 df2 = df.merge(student_info_df, left_on=email_column_name, right_on="email_joined", how="left")
-            elif moodleid_column_name:
-                df2 = df.merge(student_info_df, left_on=moodleid_column_name, right_on="id_joined", how="left")
+            elif moodle_id_column_name:
+                df2 = df.merge(student_info_df, left_on=moodle_id_column_name, right_on="id_joined", how="left")
     return df2
 
 
-def get_moodleid_column_name(df):
-    moodleid_column_name = None
+def get_moodle_id_column_name(df):
+    moodle_id_column_name = None
     try:
         choice = int(input("Choose Moodle ID Column (or Q for Email Column instead): ")) - 1
         if choice < 0 or choice > len(df.columns):
             print("Invalid input")
             exit()
-        moodleid_column_name = df.columns[choice]
+        moodle_id_column_name = df.columns[choice]
     except ValueError:
         pass
-    return moodleid_column_name
+    return moodle_id_column_name
 
 
 def get_column_choice(choose_text_string, df):
@@ -131,7 +131,7 @@ def get_column_choice(choose_text_string, df):
     return choice
 
 
-def get_courseid(ms):
+def get_course_id(ms):
     courses = ms.get_recent_courses()
     for i, course in enumerate(courses.keys()):
         print(f"[{i + 1}] {course}")
@@ -147,7 +147,7 @@ def get_courseid(ms):
     return course_id
 
 
-def login_moodlesync():
+def login_moodle_sync():
     credentials_file = input("Enter path to credentials file or 'y' for data/credentials.json: ")
     if credentials_file == "y":
         credentials_file = "data/credentials.json"
@@ -173,7 +173,7 @@ def login_moodlesync():
     return ms
 
 
-def read_in_ecxel(file):
+def read_in_excel(file):
     try:
         file = openpyxl.load_workbook(file, data_only=True)
     except FileNotFoundError:

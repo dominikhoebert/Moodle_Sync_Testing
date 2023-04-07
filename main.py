@@ -12,6 +12,7 @@ if __name__ == "__main__":
 
     if args.dialog:
         dialog(args.file)
+        exit()
 
     if args.credentials:
         try:
@@ -45,11 +46,11 @@ if __name__ == "__main__":
     try:
         if args.file.endswith(".xlsx"):
             if args.sheet.isdigit():
-                df = pd.read_excel(args.file, sheet_name=int(args.sheet))
+                student_df = pd.read_excel(args.file, sheet_name=int(args.sheet))
             else:
-                df = pd.read_excel(args.file, sheet_name=args.sheet)
+                student_df = pd.read_excel(args.file, sheet_name=args.sheet)
         elif args.file.endswith(".csv"):
-            df = pd.read_csv(args.file)
+            student_df = pd.read_csv(args.file)
     except FileNotFoundError:
         print(f"Error: {args.file} not found. Exiting...")
         exit()
@@ -60,3 +61,19 @@ if __name__ == "__main__":
     if not (args.course_id and (args.moodleid_col or args.email_col) and args.group_col):
         print("Error: Missing Column arguments. Exiting...")
         exit()
+
+    student_info_df = ms.get_enrolled_students(args.course_id)
+
+    if args.moodleid_col:
+        moodle_id_column_name = args.moodleid_col
+        email_column_name = None
+        df2 = student_df.merge(student_info_df, left_on=moodle_id_column_name, right_on="id_joined", how="left")
+    elif args.email_col:
+        email_column_name = args.email_col
+        df2 = student_df.merge(student_info_df, left_on=email_column_name, right_on="email_joined", how="left")
+        moodle_id_column_name = None
+
+    group_column_name = args.group_col
+
+    if args.add_students:
+        ...
