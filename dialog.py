@@ -54,18 +54,19 @@ def dialog(file):
         group_id = datestring + str(random.randrange(100, 999))
         group_ids[g] = group_id
         groups.append(
-            {"courseid": course_id, "name": g, "description": "", "id": group_id})
+            {"courseid": course_id, "name": g, "description": "", "idnumber": group_id})
 
     response = ms.create_group(groups)
 
     groupsids = {}
     for g in response:
-        groupsids[g["id_joined"]] = g["id"]
+        groupsids[g["idnumber"]] = g["id"]
+
 
     # add students to groups
     members = []
     for g in group_names:
-        for user_id in df[df[group_column_name] == g]["id_joined"].tolist():
+        for user_id in df[df[group_column_name] == g][moodleid_column_name].tolist():
             members.append({"groupid": groupsids[group_ids[g]], "userid": user_id})
 
     print(members)
