@@ -1,4 +1,5 @@
 import json
+import sys
 import warnings
 from datetime import datetime
 import random
@@ -10,12 +11,15 @@ import pandas as pd
 from moodle_sync import MoodleSync
 from dialog import dialog
 
-logger.add("logs/moodle_sync_testing.log", rotation="50 MB", level="INFO")
-
 if __name__ == "__main__":
     warnings.simplefilter("ignore")
 
     args = parse()
+    logger.add("logs/moodle_sync_testing.log", rotation="50 MB", level="INFO")
+
+    if args.no_output:
+        logger.disable("__main__")
+
     logger.info(f"Arguments: {args}")
 
     if args.dialog:
@@ -76,10 +80,12 @@ if __name__ == "__main__":
     if args.moodleid_col:
         moodle_id_column_name = args.moodleid_col
         email_column_name = None
-        student_df_merged = student_df.merge(student_info_df, left_on=moodle_id_column_name, right_on="id_joined", how="left")
+        student_df_merged = student_df.merge(student_info_df, left_on=moodle_id_column_name, right_on="id_joined",
+                                             how="left")
     elif args.email_col:
         email_column_name = args.email_col
-        student_df_merged = student_df.merge(student_info_df, left_on=email_column_name, right_on="email_joined", how="left")
+        student_df_merged = student_df.merge(student_info_df, left_on=email_column_name, right_on="email_joined",
+                                             how="left")
         moodle_id_column_name = "id_joined"
 
     group_column_name = args.group_col
@@ -101,9 +107,11 @@ if __name__ == "__main__":
             r = ms.enroll_students(enrolments)
             student_info_df = ms.get_enrolled_students(args.course_id)
             if email_column_name:
-                student_df_merged = student_df.merge(student_info_df, left_on=email_column_name, right_on="email_joined", how="left")
+                student_df_merged = student_df.merge(student_info_df, left_on=email_column_name,
+                                                     right_on="email_joined", how="left")
             else:
-                student_df_merged = student_df.merge(student_info_df, left_on=moodle_id_column_name, right_on="id_joined", how="left")
+                student_df_merged = student_df.merge(student_info_df, left_on=moodle_id_column_name,
+                                                     right_on="id_joined", how="left")
 
     student_df_merged = student_df_merged[student_df_merged["id_joined"].notnull()]
     student_df_merged = student_df_merged[student_df_merged[group_column_name].notnull()]
@@ -123,18 +131,24 @@ if __name__ == "__main__":
         groups.append(
             {"courseid": args.course_id, "name": g, "description": "", "idnumber": group_id})
 
-    response = ms.create_group(groups)
-    groups_ids = {}
-    for g in response:
-        groups_ids[g["idnumber"]] = g["id"]
+    if args.preview is False:
+        response = ms.create_group(groups)
+        groups_ids = {}
+        for g in response:
+            groups_ids[g["idnumber"]] = g["id"]
+    else:
+        groups_ids = {}
+        for g in groups:
+            groups_ids[g["idnumber"]] = g["idnumber"]
 
     # add students to groups
     members = []
     for g in group_names:
         logger.info(f"Adding students to group {g}:")
         for row in student_df_merged[student_df_merged[group_column_name] == g].iterrows():
-            logger.info(f"  {row}")
-            members.append({"groupid": groups_ids[group_ids[g]], "userid": row[moodle_id_column_name]})
+            mail = row[1]["email_joined"]
+            logger.info(f"  {mail}")
+            members.append({"groupid": groups_ids[group_ids[g]], "userid": row[1][moodle_id_column_name]})
 
     if args.preview is False:
         response = ms.add_students_to_group(members)
