@@ -44,8 +44,14 @@ options:
   -d, --dialog          dialog mode, no arguments needed  
 
 
+## [Docker](https://hub.docker.com/r/dominik1220/moodle_sync_testing)
+
+`docker pull dominik1220/moodle_sync_testing`
+
+`docker run -it -v ${pwd}/data:/app/data --rm dominik1220/moodle_sync_testing data/test.csv -i 1234 -c data/credentials.json -e email -g groupname -r`  
+`docker run -it -v ${pwd}/data:/app/data --rm dominik1220/moodle_sync_testing data/test.csv -d`
+
 
 ## TODO
 
 - check for existing groups (needs core_group_get_course_groups)
-- Docker image
