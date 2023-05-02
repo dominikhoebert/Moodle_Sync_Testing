@@ -110,7 +110,7 @@ class MoodleSync:
 if __name__ == "__main__":
     import json
 
-    with open("data/credentials.json", "r") as f:
+    with open("../Moodle_Sync_Testing_Textual/data/credentials.json", "r") as f:
         credentials = json.load(f)
     url = credentials["url"]
     username = credentials["user"]

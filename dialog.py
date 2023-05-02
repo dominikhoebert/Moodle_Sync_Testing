@@ -152,7 +152,7 @@ def get_course_id(ms):
 def login_moodle_sync():
     credentials_file = input("Enter path to credentials file or 'y' for data/credentials.json: ")
     if credentials_file == "y":
-        credentials_file = "data/credentials.json"
+        credentials_file = "../Moodle_Sync_Testing_Textual/data/credentials.json"
     try:
         with open(credentials_file, "r") as f:
             credentials = json.load(f)
