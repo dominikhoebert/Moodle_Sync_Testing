@@ -52,15 +52,9 @@ def parse():
         type=str
     )
     parser.add_argument(
-        "-m", "--moodle-id-col",
-        help="Column Name of Moodle ID",
-        dest="moodleid_col",
-        type=str,
-    )
-    parser.add_argument(
-        "-e", "--email-col",
-        help="Column Name of Email",
-        dest="email_col",
+        "-n", "--col-name",
+        help="Column Name of Moodle ID or Email",
+        dest="col_name",
         type=str,
     )
     parser.add_argument(
