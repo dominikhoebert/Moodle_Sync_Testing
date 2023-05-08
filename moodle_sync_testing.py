@@ -1,4 +1,5 @@
 import pandas as pd
+import loguru
 
 from moodle_sync import MoodleSync
 from pandas import DataFrame
@@ -8,7 +9,7 @@ import random
 
 class MoodleSyncTesting(MoodleSync):
     def __init__(self, url: str, username: str, password: str, service: str, course_id: int, students: DataFrame,
-                 column_name: str, group_column_name: str):
+                 column_name: str, group_column_name: str, logger: loguru = None):
         super().__init__(url, username, password, service)
         self.course_id = course_id
         self.students_original = students
@@ -17,6 +18,13 @@ class MoodleSyncTesting(MoodleSync):
         self.group_column_name = group_column_name
         self.right_on = self.get_right_on()
         self.group_names_to_id = None
+        self.logger = logger
+
+    def log(self, message: str):
+        if self.logger is not None:
+            self.logger.info(message)
+        else:
+            print(message)
 
     def get_right_on(self):
         if self.is_id_column():

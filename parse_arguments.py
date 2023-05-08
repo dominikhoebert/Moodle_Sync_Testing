@@ -1,4 +1,6 @@
 import argparse
+
+
 def parse():
     parser = argparse.ArgumentParser(
         description="Reads in an EXCEL or CSV file and creates Student Groups in Moodle"
