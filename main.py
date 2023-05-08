@@ -38,11 +38,6 @@ def check_args(args):
         logger.error("Credentials not provided. Exiting...")
         exit()
     try:
-        ms = MoodleSync(url, username, password, service)
-    except KeyError:
-        logger.error("Failed to connect to Server. Exiting...")
-        exit()
-    try:
         if args.file.endswith(".xlsx"):
             if args.sheet.isdigit():
                 student_df = pd.read_excel(args.file, sheet_name=int(args.sheet))
@@ -60,23 +55,25 @@ def check_args(args):
         logger.error("Missing Column arguments. Exiting...")
         exit()
     logger.info(f"{len(student_df)} students found in {args.file}")
-    moodle_sync = MoodleSyncTesting(url, username, password, service, args.course_id, student_df, args.col_name,
-                                    args.group_col)
+    try:
+        moodle_sync = MoodleSyncTesting(url, username, password, service, args.course_id, student_df, args.col_name,
+                                        args.group_col, logger)
+    except KeyError:
+        logger.error("Failed to connect to Server. Exiting...")
+        exit()
     return moodle_sync
 
 
-def moodle_sync_workflow(args, moodle_sync):  # TODO Logging!
+def moodle_sync_workflow(args, moodle_sync):
     moodle_sync.join_enrolled_students()
     if args.add_students:
         moodle_sync.enroll_students_for_groups()
         moodle_sync.join_enrolled_students()
     moodle_sync.clean_students()
-    for g in moodle_sync.group_names:
-        logger.info(f"Creating group {g}")
-    if args.preview:
-        ...  # TODO
-    else:
+    moodle_sync.log_count_students_in_groups()
+    if not args.preview:
         moodle_sync.create_groups()
+        moodle_sync.log_groups()
         moodle_sync.add_students_to_groups()
 
 
@@ -88,6 +85,7 @@ def main():
 
     if args.no_output:
         logger.disable("__main__")
+        logger.disable("moodle_sync_testing")
 
     logger.info(f"Arguments: {args}")
 
@@ -100,4 +98,5 @@ def main():
 
 
 if __name__ == "__main__":
+    # options: data/test.csv -c data/credentials.json -i 1309 -n "id" -g groupname
     main()

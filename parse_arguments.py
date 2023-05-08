@@ -73,7 +73,7 @@ def parse():
     )
     parser.add_argument(
         "-r", "--preview",
-        help="Previews students and groups without actually doing anything",
+        help="Previews students and groups without actually doing anything (does not work for adding students)",
         dest="preview",
         action="store_true",
     )
