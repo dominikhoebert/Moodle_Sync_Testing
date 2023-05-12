@@ -32,104 +32,29 @@ def dialog(file):
     print("Loading student infos from Moodle, please wait...")
     ms.join_enrolled_students()
 
-
-
-    df2 = enroll_students(course_id, df, df2, moodle_id_column_name, email_column_name, ms)
-    not_enrolled_df = df2[df2["id_joined"].isnull()]
-    if len(not_enrolled_df) > 0:
-        choice = input(
-            f"{len(not_enrolled_df)} Students not enrolled. Do you want to enroll them automatically? (y/n): ")
-        if choice == "y":
-            if email_column_name:
-                emails = not_enrolled_df[email_column_name].tolist()
-                response = ms.get_user_by_email(emails)
-                not_enrolled_ids = [s["id"] for s in response]
-            elif moodle_id_column_name:
-                not_enrolled_ids = not_enrolled_df[moodle_id_column_name].tolist()
-            else:
-                print("Error: No email or moodleid column found. Exiting...")
-                exit()
-            enrolments = []
-            for id in not_enrolled_ids:
-                enrolments.append({'roleid': 5, 'userid': id, 'courseid': course_id})  # 5 = student
-            # do you want to continue? or stop to enroll them manually
-            r = ms.enroll_students(enrolments)
-            print("Loading student infos from Moodle, please wait...")
-            student_info_df = ms.get_enrolled_students(course_id)
-            if email_column_name:
-                df2 = df.merge(student_info_df, left_on=email_column_name, right_on="email_joined", how="left")
-            elif moodle_id_column_name:
-                df2 = df.merge(student_info_df, left_on=moodle_id_column_name, right_on="id_joined", how="left")
-
-
-
-
-    df2 = df2[df2["id_joined"].notnull()]
-    df2 = df2[df2[group_column_name] != ""]
-    df2 = df2[df2[group_column_name].notnull()]
-
-    group_names = df2[group_column_name].unique()
-    print(f"{len(group_names)} groups found:")
-    print("\t" + "\n\t".join(group_names))
-
-    # create groups
-    groups = []
-    group_ids = {}
-    date_string = datetime.now().strftime("%Y%m%d")
-    for g in group_names:
-        group_id = date_string + str(random.randrange(100, 999))
-        group_ids[g] = group_id
-        groups.append(
-            {"courseid": course_id, "name": g, "description": "", "idnumber": group_id})
-
-    response = ms.create_group(groups)
-
-    groups_ids = {}
-    for g in response:
-        groups_ids[g["idnumber"]] = g["id"]
-
-    # add students to groups
-    members = []
-    for g in group_names:
-        for user_id in df2[df2[group_column_name] == g][moodle_id_column_name].tolist():
-            members.append({"groupid": groups_ids[group_ids[g]], "userid": user_id})
-
-    print(members)
-
-    choice = input(f"Do you want to add {len(members)} students to {len(group_names)} groups? (y/n): ")
+    choice = input(f"Do you want to enroll missing Students? (y/n): ")
     if choice == "y":
-        response = ms.add_students_to_group(members)
-        print("Done")
+        ms.enroll_students_for_groups()
+        ms.join_enrolled_students()
 
+    ms.clean_students()
+    ms.log_count_students_in_groups()
 
-def enroll_students(course_id, df, df2, moodle_id_column_name, email_column_name, ms):
-    # show students how are not enrolled
-    not_enrolled_df = df2[df2["id_joined"].isnull()]
-    if len(not_enrolled_df) > 0:
-        choice = input(
-            f"{len(not_enrolled_df)} Students not enrolled. Do you want to enroll them automatically? (y/n): ")
-        if choice == "y":
-            if email_column_name:
-                emails = not_enrolled_df[email_column_name].tolist()
-                response = ms.get_user_by_email(emails)
-                not_enrolled_ids = [s["id"] for s in response]
-            elif moodle_id_column_name:
-                not_enrolled_ids = not_enrolled_df[moodle_id_column_name].tolist()
-            else:
-                print("Error: No email or moodleid column found. Exiting...")
-                exit()
-            enrolments = []
-            for id in not_enrolled_ids:
-                enrolments.append({'roleid': 5, 'userid': id, 'courseid': course_id})  # 5 = student
-            # do you want to continue? or stop to enroll them manually
-            r = ms.enroll_students(enrolments)
-            print("Loading student infos from Moodle, please wait...")
-            student_info_df = ms.get_enrolled_students(course_id)
-            if email_column_name:
-                df2 = df.merge(student_info_df, left_on=email_column_name, right_on="email_joined", how="left")
-            elif moodle_id_column_name:
-                df2 = df.merge(student_info_df, left_on=moodle_id_column_name, right_on="id_joined", how="left")
-    return df2
+    choice = input(f"Do you want to create these groups? (y/n): ")
+    if choice != "y":
+        print("Exiting...")
+        exit()
+
+    ms.create_groups()
+    ms.log_groups()
+
+    choice = input(f"Do you want to add this students to the groups? (y/n): ")
+    if choice != "y":
+        print("Exiting...")
+        exit()
+
+    ms.add_students_to_group()
+    print("Done")
 
 
 def get_moodle_id_column_name(df):
