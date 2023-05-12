@@ -1,11 +1,11 @@
 import pandas as pd
 import json
-from moodle_sync import MoodleSync
 import openpyxl
 from openpyxl.utils import get_column_letter
 import random
 from itertools import islice
 from datetime import datetime
+from moodle_sync_testing import MoodleSyncTesting
 
 role_id = 5  # student
 
@@ -20,26 +20,50 @@ def dialog(file):
         exit()
     print(len(df), " Students found")
 
-    ms = login_moodle_sync()
-    course_id = get_course_id(ms)
-    print("Loading student infos from Moodle, please wait...")
-    student_info_df = ms.get_enrolled_students(course_id)
+    ms = login_moodle_sync(df)
+    ms.course_id = get_course_id(ms)
 
     for i, col in enumerate(df.columns):
         print(f"[{i + 1}] {col}")
 
-    group_column_name = df.columns[get_column_choice("Groupname Column", df)]
-    moodle_id_column_name = get_moodle_id_column_name(df)
+    ms.group_column_name = df.columns[get_column_choice("Groupname Column", df)]
+    ms.column_name = df.columns[get_column_choice("MoodleID/Email Column", df)]
 
-    email_column_name = None
-    if moodle_id_column_name is None:
-        email_column_name = df.columns[get_column_choice("Email Column", df)]
-        df2 = df.merge(student_info_df, left_on=email_column_name, right_on="email_joined", how="left")
-        moodle_id_column_name = "id_joined"
-    else:
-        df2 = df.merge(student_info_df, left_on=moodle_id_column_name, right_on="id_joined", how="left")
+    print("Loading student infos from Moodle, please wait...")
+    ms.join_enrolled_students()
+
+
 
     df2 = enroll_students(course_id, df, df2, moodle_id_column_name, email_column_name, ms)
+    not_enrolled_df = df2[df2["id_joined"].isnull()]
+    if len(not_enrolled_df) > 0:
+        choice = input(
+            f"{len(not_enrolled_df)} Students not enrolled. Do you want to enroll them automatically? (y/n): ")
+        if choice == "y":
+            if email_column_name:
+                emails = not_enrolled_df[email_column_name].tolist()
+                response = ms.get_user_by_email(emails)
+                not_enrolled_ids = [s["id"] for s in response]
+            elif moodle_id_column_name:
+                not_enrolled_ids = not_enrolled_df[moodle_id_column_name].tolist()
+            else:
+                print("Error: No email or moodleid column found. Exiting...")
+                exit()
+            enrolments = []
+            for id in not_enrolled_ids:
+                enrolments.append({'roleid': 5, 'userid': id, 'courseid': course_id})  # 5 = student
+            # do you want to continue? or stop to enroll them manually
+            r = ms.enroll_students(enrolments)
+            print("Loading student infos from Moodle, please wait...")
+            student_info_df = ms.get_enrolled_students(course_id)
+            if email_column_name:
+                df2 = df.merge(student_info_df, left_on=email_column_name, right_on="email_joined", how="left")
+            elif moodle_id_column_name:
+                df2 = df.merge(student_info_df, left_on=moodle_id_column_name, right_on="id_joined", how="left")
+
+
+
+
     df2 = df2[df2["id_joined"].notnull()]
     df2 = df2[df2[group_column_name] != ""]
     df2 = df2[df2[group_column_name].notnull()]
@@ -149,10 +173,10 @@ def get_course_id(ms):
     return course_id
 
 
-def login_moodle_sync():
+def login_moodle_sync(df):
     credentials_file = input("Enter path to credentials file or 'y' for data/credentials.json: ")
     if credentials_file == "y":
-        credentials_file = "../Moodle_Sync_Testing_Textual/data/credentials.json"
+        credentials_file = "./data/credentials.json"
     try:
         with open(credentials_file, "r") as f:
             credentials = json.load(f)
@@ -168,7 +192,7 @@ def login_moodle_sync():
         print("Error: Invalid credentials file. Exiting...")
         exit()
     try:
-        ms = MoodleSync(url, username, password, service)
+        ms = MoodleSyncTesting(url, username, password, service, None, df, None, None)
     except KeyError:
         print("Error: Failed to connect to Server. Exiting...")
         exit()
