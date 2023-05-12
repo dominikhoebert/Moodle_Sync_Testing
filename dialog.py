@@ -20,14 +20,14 @@ def dialog(file):
         exit()
     print(len(df), " Students found")
 
-    ms = login_moodle_sync(df)
-    ms.course_id = get_course_id(ms)
-
     for i, col in enumerate(df.columns):
         print(f"[{i + 1}] {col}")
 
-    ms.group_column_name = df.columns[get_column_choice("Groupname Column", df)]
-    ms.column_name = df.columns[get_column_choice("MoodleID/Email Column", df)]
+    group_column_name = df.columns[get_column_choice("Groupname Column", df)]
+    column_name = df.columns[get_column_choice("MoodleID/Email Column", df)]
+
+    ms = login_moodle_sync(df, group_column_name, column_name)
+    ms.course_id = get_course_id(ms)
 
     print("Loading student infos from Moodle, please wait...")
     ms.join_enrolled_students()
@@ -53,7 +53,7 @@ def dialog(file):
         print("Exiting...")
         exit()
 
-    ms.add_students_to_group()
+    ms.add_students_to_groups()
     print("Done")
 
 
@@ -98,7 +98,7 @@ def get_course_id(ms):
     return course_id
 
 
-def login_moodle_sync(df):
+def login_moodle_sync(df, group_column_name, column_name):
     credentials_file = input("Enter path to credentials file or 'y' for data/credentials.json: ")
     if credentials_file == "y":
         credentials_file = "./data/credentials.json"
@@ -117,7 +117,7 @@ def login_moodle_sync(df):
         print("Error: Invalid credentials file. Exiting...")
         exit()
     try:
-        ms = MoodleSyncTesting(url, username, password, service, None, df, None, None)
+        ms = MoodleSyncTesting(url, username, password, service, None, df, column_name, group_column_name)
     except KeyError:
         print("Error: Failed to connect to Server. Exiting...")
         exit()
